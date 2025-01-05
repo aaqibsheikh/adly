@@ -1,0 +1,22 @@
+FROM node:16.13.1-alpine3.14
+
+ARG WORK_DIR=/usr/src/app
+ARG PORT=4040
+ARG APP_VERSION=develop
+
+
+ENV REACT_APP_VERSION=${APP_VERSION}
+
+
+WORKDIR $WORK_DIR
+
+# copy package files
+COPY package.json yarn.lock ./
+
+# install modules
+RUN yarn install --frozen-lockfile
+
+# run application
+EXPOSE $PORT
+
+CMD ["yarn", "start"]

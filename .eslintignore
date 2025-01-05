@@ -1,0 +1,3 @@
+/node_modules
+dist
+/public/model-viewer-1.12.0-no-s3-cache.min.js

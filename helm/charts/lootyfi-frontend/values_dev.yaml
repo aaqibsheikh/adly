@@ -1,0 +1,112 @@
+replicaCount: 1
+
+image:
+  repository: "300826030284.dkr.ecr.eu-central-1.amazonaws.com"
+  name: lootyfi-frontend
+  pullPolicy: "IfNotPresent"
+  tag: "${{ TAG }}"
+
+labels:
+  app.kubernetes.io/name: "lootyfi-frontend"
+
+service:
+  port: 80
+  targetport: 80
+  selectorLabels:
+    app.kubernetes.io/name: "lootyfi-frontend"
+  serviceType: "ClusterIP"
+
+serviceAccount:
+  create: true
+  name: "lootyfi-frontend"
+  annotations: {}
+
+ingress:
+  enabled: true
+  apiVersion: networking.k8s.io/v1
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/tags: lootyfi-frontend-dev=true
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: lootyfi-frontend-eks
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:300826030284:certificate/2d0ecc23-aa0b-4051-bbcb-0fd609f9231a
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=60
+    alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=true
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http2.enabled=true
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
+    alb.ingress.kubernetes.io/success-codes: 200,302,301,404
+
+  hosts:
+    - host: lootyfi.develop.assetize.today
+      paths:
+      - path: "/"
+        serviceName: lootyfi-frontend
+        servicePort: 80
+
+resources:
+  requests:
+    cpu: 128m
+    memory: 256Mi
+  limits:
+    cpu: '1'
+    memory: 4Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+livenessProbe:
+  enabled: false
+  path: "/version"
+  port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 3
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: false
+  path: "/version"
+  port: 3000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+environmentVar:
+  enabled: true
+  envs:
+    TEST: "test"
+
+environmentVarFrom:
+  enabled: true
+  secretname: frontend
+
+podAnnotations:
+  vault.hashicorp.com/agent-inject: 'true'
+  vault.hashicorp.com/role: 'lootyfi-frontend'
+  vault.hashicorp.com/agent-pre-populate-only: 'true'
+  vault.hashicorp.com/tls-skip-verify: 'true'
+  vault.hashicorp.com/agent-inject-secret-config: 'dev/data/lootyfi-frontend'
+  vault.hashicorp.com/agent-inject-template-config:  |
+    {{ with secret "dev/data/lootyfi-frontend" -}}
+      {{ range $k, $v := .Data.data }}
+          export {{ $k }}='{{ $v }}'
+      {{ end }}
+    {{- end }}
+
+persistence:
+  name: lootyfi-frontend-disk
+  enabled: false
+  storageClass: ebs-sc
+  accessMode: ReadWriteMany
+  size: 10Gi
+  mountPath: "/data"

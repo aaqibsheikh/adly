@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>My page</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, width=device-width" />
+    <script
+      src="https://unpkg.com/react@latest/umd/react.development.js"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://unpkg.com/react-dom@latest/umd/react-dom.development.js"></script>
+    <script
+      src="https://unpkg.com/babel-standalone@latest/babel.min.js"
+      crossorigin="anonymous"
+    ></script>
+
+    <script src="https://cdn.auth0.com/js/auth0/9.18/auth0.min.js"></script>
+    <script src="https://cdn.auth0.com/js/polyfills/1.0/object-assign.min.js"></script>
+
+    <!-- Fonts to support Material Design -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
+    />
+    <!-- Icons to support Material Design -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      window.addEventListener('load', function () {
+        const {
+          colors,
+          CssBaseline,
+          ThemeProvider,
+          Typography,
+          Container,
+          createTheme,
+          Box,
+          Link,
+          TextField,
+          Paper,
+          Button,
+          Divider,
+          Backdrop,
+          CircularProgress,
+        } = MaterialUI;
+
+        const config = JSON.parse(decodeURIComponent(escape(window.atob('@@config@@'))));
+
+        const params = Object.assign(
+          {
+            overrides: {
+              __tenant: config.auth0Tenant,
+              __token_issuer: config.authorizationServer.issuer,
+            },
+            domain: config.auth0Domain,
+            clientID: config.clientID,
+            redirectUri: config.callbackURL,
+            responseType: 'code',
+          },
+          config.internalOptions,
+        );
+
+        const webAuth = new auth0.WebAuth(params);
+        const databaseConnection = 'Username-Password-Authentication';
+
+        // Create a theme instance.
+        const theme = createTheme({
+          palette: {
+            primary: {
+              main: colors.common['black'],
+              contrastText: colors.common['white'],
+            },
+            secondary: {
+              main: colors.blue['600'],
+              contrastText: colors.grey['A100'],
+            },
+            success: {
+              main: colors.green['600'],
+              contrastText: colors.grey['A100'],
+            },
+            warning: {
+              main: colors.amber['A200'],
+              contrastText: colors.grey['A100'],
+            },
+            error: {
+              main: colors.red['600'],
+              contrastText: colors.grey['A100'],
+            },
+            info: {
+              main: colors.common['white'],
+            },
+          },
+          components: {
+            MuiButton: {
+              defaultProps: {
+                disableRipple: true,
+                disableFocusRipple: true,
+                disableTouchRipple: true,
+              },
+              styleOverrides: {
+                root: {
+                  textTransform: 'none',
+                  borderRadius: 4,
+                  padding: '10px 32px',
+                  fontSize: 15,
+                },
+              },
+            },
+            MuiTextField: {
+              defaultProps: { variant: 'outlined', size: 'small' },
+              styleOverrides: {
+                root: {},
+              },
+            },
+            MuiToggleButtonGroup: {
+              styleOverrides: {
+                root: {
+                  height: '48px',
+                  borderRadius: '6px',
+                  textTransform: 'none',
+                },
+              },
+            },
+            MuiToggleButton: {
+              styleOverrides: {
+                root: {
+                  'height': '48px',
+                  'width': '182px',
+                  'textTransform': 'none',
+                  'border': `1px solid ${colors.common['black']}`,
+                  'color': colors.common['black'],
+                  'fontSize': '14px',
+                  '&.Mui-selected': {
+                    'color': colors.common['white'],
+                    'backgroundColor': colors.common['black'],
+                    '&:hover': {
+                      color: colors.common['white'],
+                      backgroundColor: colors.common['black'],
+                    },
+                  },
+                  '&:hover': {
+                    background: 'none',
+                  },
+                },
+              },
+            },
+            MuiDivider: {
+              styleOverrides: {
+                wrapper: {
+                  padding: '0 16px 0 0',
+                },
+              },
+            },
+            MuiOutlinedInput: {
+              styleOverrides: {
+                root: {
+                  'height': '48px',
+                  'fontSize': '14px',
+                  '& fieldset': {
+                    border: `1px solid ${colors.grey['300']}`,
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    border: `1px solid ${colors.common.black}`,
+                  },
+                  ':hover': {
+                    '.MuiOutlinedInput-notchedOutline': {
+                      border: `1px solid ${colors.common.black}`,
+                    },
+                  },
+                  '& input::placeholder': {
+                    fontSize: '14px',
+                  },
+                  '& .MuiFormLabel': {
+                    top: '4px',
+                  },
+                },
+              },
+            },
+            MuiFormHelperText: {
+              styleOverrides: {
+                root: {
+                  color: colors.red['600'],
+                },
+              },
+            },
+            MuiInputLabel: {
+              styleOverrides: {
+                root: {
+                  '& .MuiInputLabel-asterisk': {
+                    color: colors.red['600'],
+                  },
+                },
+              },
+            },
+            MuiMenuItem: {
+              styleOverrides: {
+                root: {
+                  fontSize: '14px',
+                },
+              },
+            },
+          },
+        });
+
+        function App() {
+          const [form, setForm] = React.useState({ email: '', password: '' });
+          const [formError, setFormError] = React.useState('');
+          const [recoveryPassword, setRecoveryPassword] = React.useState('');
+          const [isLoading, setIsLoading] = React.useState(false);
+
+          const [mode, setMode] = React.useState('login');
+
+          React.useEffect(() => {
+            if (config.extraParams && config.extraParams.screen_hint === 'signup') {
+              setMode('signup');
+            }
+
+            if (config.extraParams && config.extraParams.email) {
+              setForm(prev => ({ ...prev, email: config.extraParams.email }));
+            }
+
+            if (config.extraParams && config.extraParams.pass) {
+              setForm(prev => ({ ...prev, password: config.extraParams.pass }));
+            }
+          }, []);
+
+          const changeHandler = e => {
+            const name = e.target.name;
+            const value = e.target.value;
+
+            setForm(prevValue => ({ ...prevValue, [name]: value }));
+          };
+
+          const displayError = err => {
+            if (typeof err.description == 'object' && err.policy !== undefined) {
+              setFormError(err.policy);
+            }
+
+            if (typeof err.description === 'string') {
+              setFormError(err.description);
+            }
+
+            // if (!err.description && err.original.message) {
+            //   setFormError(err.original.message);
+            // }
+          };
+
+          const signupHandler = React.useCallback(() => {
+            setIsLoading(true);
+            webAuth.redirect.signupAndLogin(
+              {
+                connection: databaseConnection,
+                email: form.email,
+                password: form.password,
+              },
+              function (err, res) {
+                if (res) setIsLoading(false);
+
+                if (err) {
+                  setIsLoading(false);
+                  displayError(err);
+                }
+              },
+            );
+          }, [form]);
+
+          const loginHandler = React.useCallback(() => {
+            setIsLoading(true);
+            webAuth.login(
+              {
+                realm: databaseConnection,
+                username: form.email,
+                password: form.password,
+              },
+              function (err, res) {
+                if (res) setIsLoading(false);
+
+                if (err) {
+                  setIsLoading(false);
+                  displayError(err);
+                }
+              },
+            );
+          }, [form]);
+
+          const loginWithGoogle = React.useCallback(() => {
+            webAuth.authorize(
+              {
+                connection: 'google-oauth2',
+              },
+              function (err) {
+                if (err) displayError(err);
+              },
+            );
+          }, []);
+
+          const forgotPassword = React.useCallback(() => {
+            setIsLoading(true);
+            webAuth.changePassword(
+              {
+                connection: databaseConnection,
+                email: form.email,
+              },
+              function (err, res) {
+                if (res) {
+                  setRecoveryPassword(res);
+                  setIsLoading(false);
+                }
+
+                if (err) {
+                  setIsLoading(false);
+                  displayError(err);
+                }
+              },
+            );
+          }, [form]);
+
+          React.useEffect(() => {
+            let recoveryPasswordTimout;
+
+            if (recoveryPassword) {
+              recoveryPasswordTimout = setTimeout(() => {
+                setRecoveryPassword('');
+              }, 5000);
+            }
+
+            return () => clearTimeout(recoveryPasswordTimout);
+          }, [recoveryPassword]);
+
+          return (
+            <Box
+              sx={{
+                position: 'relative',
+                height: '100vh',
+                width: '100vw',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Paper
+                elevation={3}
+                sx={{
+                  position: 'absolute',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  maxWidth: '400px',
+                  padding: '20px',
+                }}
+              >
+                <Box>
+                  <Typography
+                    component="h1"
+                    sx={{
+                      fontSize: '32px',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Welcome to Assetize
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                    maxWidth: '400px',
+                    margin: '0 auto',
+                    padding: '20px',
+                  }}
+                >
+                  <TextField
+                    id="email"
+                    name="email"
+                    label="Email"
+                    fullWidth
+                    value={form.email}
+                    onChange={changeHandler}
+                    onBlur={() => setFormError([])}
+                  />
+                  <TextField
+                    id="password"
+                    name="password"
+                    label="Password"
+                    type="password"
+                    fullWidth
+                    value={form.password}
+                    onChange={changeHandler}
+                    onBlur={() => setFormError([])}
+                  />
+
+                  {mode === 'signup' && (
+                    <Button
+                      color="primary"
+                      variant="contained"
+                      sx={{ width: '100%' }}
+                      onClick={signupHandler}
+                    >
+                      Sign up
+                    </Button>
+                  )}
+
+                  {mode === 'login' && (
+                    <Button
+                      color="primary"
+                      variant="contained"
+                      sx={{ width: '100%' }}
+                      onClick={loginHandler}
+                    >
+                      Log in
+                    </Button>
+                  )}
+
+                  {formError.length ? (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        background: colors.red[100],
+                        border: `1px solid ${colors.red[700]}`,
+                        borderRadius: '4px',
+                        padding: '10px',
+                      }}
+                    >
+                      <Typography sx={{ color: colors.red[700], fontSize: '12px' }}>
+                        {formError}
+                      </Typography>
+                    </Box>
+                  ) : null}
+
+                  {recoveryPassword && (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        background: colors.green[50],
+                        border: `1px solid ${colors.green[700]}`,
+                        borderRadius: '4px',
+                        padding: '10px',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => setRecoveryPassword('')}
+                    >
+                      <Typography sx={{ color: colors.green[700], fontSize: '12px' }}>
+                        {recoveryPassword}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {mode === 'login' && !recoveryPassword && (
+                    <Box>
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        onClick={forgotPassword}
+                      >
+                        Forgot password ?
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <Divider sx={{ width: '100%' }} />
+
+                  <Button
+                    variant="outlined"
+                    sx={{ width: '100%' }}
+                    onClick={loginWithGoogle}
+                    startIcon={
+                      <img
+                        width="25px"
+                        src={'https://freesvg.org/img/1534129544.png'}
+                        alt="google icon"
+                      />
+                    }
+                  >
+                    Connect with Google
+                  </Button>
+                </Box>
+              </Paper>
+              <Backdrop open={isLoading}>
+                <CircularProgress color="info" />
+              </Backdrop>
+            </Box>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+          <ThemeProvider theme={theme}>
+            {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
+            <CssBaseline />
+            <App />
+          </ThemeProvider>,
+        );
+      });
+    </script>
+  </body>
+</html>

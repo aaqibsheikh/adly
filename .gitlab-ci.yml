@@ -1,0 +1,361 @@
+stages:
+  - pre_build
+  - publish_dev
+  - dev_release
+  # - publish_staging
+  # - staging_release
+  - pre_build_prod
+  - publish_prod
+  - prod_release  
+
+variables:
+  aws_acc_id: 300826030284
+  aws_region: eu-central-1
+  project: adly
+  build_image: node:20.10.0
+  service: adly-frontend
+
+pre_build_dev:
+  stage: pre_build
+  image: ${build_image}
+  variables: 
+    env: dev
+  before_script:
+    - export REACT_APP_PLATFORM_API_URL=$DEV_REACT_APP_PLATFORM_API_URL
+    - export REACT_APP_API_KEY=$DEV_REACT_APP_API_KEY
+    - export REACT_APP_PROJECT_ID=$DEV_REACT_APP_PROJECT_ID
+    - export REACT_APP_RAFFLE_DATE=$DEV_REACT_APP_RAFFLE_DATE
+    - export REACT_APP_LOOTY_QIIBEE_CONTRACT_ADDRESS=$DEV_REACT_APP_LOOTY_QIIBEE_CONTRACT_ADDRESS
+    - export REACT_APP_LOOTY_KEY_CONTRACT_ADDRESS=$DEV_REACT_APP_LOOTY_KEY_CONTRACT_ADDRESS
+    - export REACT_APP_LOOTY_AVAX_CONTRACT_ADDRESS=$DEV_REACT_APP_LOOTY_AVAX_CONTRACT_ADDRESS
+    - export REACT_APP_CHAIN_NETWORK=$DEV_REACT_APP_CHAIN_NETWORK
+    - export REACT_APP_ENVIRONMENT=$DEV_REACT_APP_ENVIRONMENT
+  script:
+    - yarn install --frozen-lockfile && CI=false yarn build
+  artifacts:
+    paths:
+      - infra
+      - build
+    expire_in: 3 days
+  only:
+    - feature/new-dev
+
+publish_dev:
+  stage: publish_dev
+  variables:
+    GIT_STRATEGY: none
+    DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+    AWS_DEFAULT_REGION: eu-central-1
+    APP_NAME: assetize-dev-lootyfi-frontend
+    DOCKER_HOST: tcp://docker:2375
+  image: 
+    name: amazon/aws-cli
+    entrypoint: [""]
+  services:
+    - docker:dind
+  before_script:
+    - amazon-linux-extras install docker
+    - aws --version
+    - docker --version
+  script:
+    - echo $AWS_ACCESS_KEY_ID
+    - docker build -f "${CI_PROJECT_DIR}/infra/Dockerfile" -t $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID . 
+    - aws ecr get-login-password | docker login --username AWS --password-stdin $DOCKER_REGISTRY
+    - docker push $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID
+  dependencies:
+    - pre_build_dev
+  only:
+    - feature/new-dev 
+
+dev_release:
+  stage: dev_release
+  dependencies:
+    - publish_dev
+  only:
+    - feature/new-dev
+  variables:
+    ENV: dev
+    DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+    APP_NAME: assetize-dev-lootyfi-frontend
+    EKS_CLUSTER: assetize-dev-eks
+    KUBE_NAMESPACE: dev
+  image: 
+    name: jshimko/kube-tools-aws
+  script:
+    - aws eks update-kubeconfig --name $EKS_CLUSTER
+    - kubectl get nodes
+    - |
+      helm upgrade lootyfi-frontend ${CI_PROJECT_DIR}/helm/charts/lootyfi-frontend --install --wait \
+        --namespace=$KUBE_NAMESPACE \
+        --set=app.name=lootyfi-frontend \
+        --set=image.repository=$DOCKER_REGISTRY \
+        --set=image.name=$APP_NAME \
+        --set=image.tag=$CI_PIPELINE_IID \
+        --debug \
+        --values=${CI_PROJECT_DIR}/helm/charts/lootyfi-frontend/values_$ENV.yaml
+
+
+
+pre_build_prod:
+  stage: pre_build
+  image: ${build_image}
+  variables: 
+    env: prod
+  before_script:
+    - export REACT_APP_PLATFORM_API_URL=$PROD_REACT_APP_PLATFORM_API_URL
+    - export REACT_APP_API_KEY=$PROD_REACT_APP_API_KEY
+    - export REACT_APP_PROJECT_ID=$PROD_REACT_APP_PROJECT_ID
+    - export REACT_APP_RAFFLE_DATE=$PROD_REACT_APP_RAFFLE_DATE
+    - export REACT_APP_LOOTY_QIIBEE_CONTRACT_ADDRESS=$PROD_REACT_APP_LOOTY_QIIBEE_CONTRACT_ADDRESS
+    - export REACT_APP_LOOTY_KEY_CONTRACT_ADDRESS=$PROD_REACT_APP_LOOTY_KEY_CONTRACT_ADDRESS
+    - export REACT_APP_LOOTY_AVAX_CONTRACT_ADDRESS=$PROD_REACT_APP_LOOTY_AVAX_CONTRACT_ADDRESS
+    - export REACT_APP_CHAIN_NETWORK=$PROD_REACT_APP_CHAIN_NETWORK
+    - export REACT_APP_ENVIRONMENT=$PROD_REACT_APP_ENVIRONMENT
+  script:
+    - yarn install --frozen-lockfile && CI=false yarn build
+  artifacts:
+    paths:
+      - infra
+      - build
+    expire_in: 3 days
+  only:
+    - main
+
+publish_prod:
+  stage: publish_prod
+  variables:
+    GIT_STRATEGY: none
+    DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+    AWS_DEFAULT_REGION: eu-central-1
+    APP_NAME: assetize-prod-lootyfi-frontend
+    DOCKER_HOST: tcp://docker:2375
+  image: 
+    name: amazon/aws-cli
+    entrypoint: [""]
+  services:
+    - docker:dind
+  before_script:
+    - amazon-linux-extras install docker
+    - aws --version
+    - docker --version
+  script:
+    - echo $AWS_ACCESS_KEY_ID
+    - docker build -f "${CI_PROJECT_DIR}/infra/Dockerfile" -t $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID . 
+    - aws ecr get-login-password | docker login --username AWS --password-stdin $DOCKER_REGISTRY
+    - docker push $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID
+  dependencies:
+    - pre_build_prod
+  only:
+    - main
+
+prod_release:
+  stage: prod_release
+  dependencies:
+    - publish_prod
+  only:
+    - main
+  variables:
+    ENV: prod
+    DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+    APP_NAME: assetize-prod-lootyfi-frontend
+    EKS_CLUSTER: assetize-dev-eks
+    KUBE_NAMESPACE: stag
+  image: 
+    name: jshimko/kube-tools-aws
+  script:
+    - aws eks update-kubeconfig --name $EKS_CLUSTER
+    - kubectl get nodes
+    - |
+      helm upgrade lootyfi-frontend ${CI_PROJECT_DIR}/helm/charts/lootyfi-frontend --install --wait \
+        --namespace=$KUBE_NAMESPACE \
+        --set=app.name=lootyfi-frontend \
+        --set=image.repository=$DOCKER_REGISTRY \
+        --set=image.name=$APP_NAME \
+        --set=image.tag=$CI_PIPELINE_IID \
+        --debug \
+        --values=${CI_PROJECT_DIR}/helm/charts/lootyfi-frontend/values_$ENV.yaml
+  
+
+# pre_build_stg:
+#   stage: pre_build
+#   image: ${build_image}
+#   variables: 
+#     env: stg
+#   before_script:
+#     - export REACT_APP_AUTH0_AUDIENCE=$STG_REACT_APP_AUTH0_AUDIENCE 
+#     - export REACT_APP_AUTH0_CLIENT_ID=$STG_REACT_APP_AUTH0_CLIENT_ID 
+#     - export REACT_APP_AUTH0_DOMAIN=$STG_REACT_APP_AUTH0_DOMAIN
+#     - export REACT_APP_PLATFORM_API_URL=$STG_REACT_APP_PLATFORM_API_URL
+#     - export PORT=$STG_PORT
+#     - export REACT_APP_VERSION=$(node -p "require('./package.json').version")
+#     - export REACT_APP_SEGMENT_ANALYTIC_KEY=$STG_REACT_APP_SEGMENT_ANALYTIC_KEY
+#     - export REACT_APP_API_KEY=$STG_REACT_APP_API_KEY
+#     - export REACT_APP_STRIPE_CONNECT_CLIENT_ID=$STG_REACT_APP_STRIPE_CONNECT_CLIENT_ID
+#     - export REACT_APP_STRIPE_CONNECT_SCOPE=$STG_REACT_APP_STRIPE_CONNECT_SCOPE
+#     - export REACT_APP_STRIPE_CONNECT_REDIRECT_URL=$STG_REACT_APP_STRIPE_CONNECT_REDIRECT_URL
+#     - export REACT_APP_FRONTEND_CLIENT_URL=$STG_REACT_APP_FRONTEND_CLIENT_URL
+#   script:
+#     - yarn install --frozen-lockfile && CI=false yarn build
+#   artifacts:
+#     paths:
+#       - infra
+#       - build
+#     expire_in: 3 days
+#   only:
+#     - feature/new-dev 
+#     # - /^q.*$/
+#   # except:
+#   #   - branches
+
+# publish_staging:
+#   stage: publish_staging
+#   variables:
+#     GIT_STRATEGY: none
+#     DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+#     AWS_DEFAULT_REGION: eu-central-1
+#     APP_NAME: assetize-stage-frontend
+#     DOCKER_HOST: tcp://docker:2375
+#   image: 
+#     name: amazon/aws-cli
+#     entrypoint: [""]
+#   services:
+#     - docker:dind
+#   before_script:
+#     - amazon-linux-extras install docker
+#     - aws --version
+#     - docker --version
+#   script:
+#     - echo $AWS_ACCESS_KEY_ID
+#     - docker build -f "${CI_PROJECT_DIR}/infra/Dockerfile" -t $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID . 
+#     - aws ecr get-login-password | docker login --username AWS --password-stdin $DOCKER_REGISTRY
+#     - docker push $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID
+#   dependencies:
+#     - pre_build_stg
+#   only:
+#     - feature/new-dev 
+
+# staging_release:
+#   stage: staging_release
+#   dependencies:
+#     - publish_staging
+#   only:
+#     - feature/new-dev 
+#   variables:
+#     ENV: stag
+#     DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+#     APP_NAME: assetize-stage-frontend
+#     EKS_CLUSTER: assetize-dev-eks
+#     KUBE_NAMESPACE: stag
+#   image: 
+#     name: jshimko/kube-tools-aws
+#   script:
+#     - aws eks update-kubeconfig --name $EKS_CLUSTER
+#     - kubectl get nodes
+#     - |
+#       helm upgrade frontend ${CI_PROJECT_DIR}/helm/charts/frontend --install --wait \
+#         --namespace=$KUBE_NAMESPACE \
+#         --set=app.name=frontend \
+#         --set=image.repository=$DOCKER_REGISTRY \
+#         --set=image.name=$APP_NAME \
+#         --set=image.tag=$CI_PIPELINE_IID \
+#         --debug \
+#         --values=${CI_PROJECT_DIR}/helm/charts/frontend/values_$ENV.yaml
+
+# pre_build_prod:
+#   stage: pre_build_prod
+#   image: ${build_image}
+#   variables: 
+#     env: prod
+#   before_script:
+#     - export REACT_APP_AUTH0_AUDIENCE=$PROD_REACT_APP_AUTH0_AUDIENCE 
+#     - export REACT_APP_AUTH0_CLIENT_ID=$PROD_REACT_APP_AUTH0_CLIENT_ID 
+#     - export REACT_APP_AUTH0_DOMAIN=$PROD_REACT_APP_AUTH0_DOMAIN
+#     - export REACT_APP_PLATFORM_API_URL=$PROD_REACT_APP_PLATFORM_API_URL
+#     - export PORT=$PROD_PORT
+#     - export REACT_APP_VERSION=$(node -p "require('./package.json').version")
+#     - export REACT_APP_SEGMENT_ANALYTIC_KEY=$PROD_REACT_APP_SEGMENT_ANALYTIC_KEY
+#     - export REACT_APP_API_KEY=$PROD_REACT_APP_API_KEY
+#     - export REACT_APP_STRIPE_CONNECT_CLIENT_ID=$PROD_REACT_APP_STRIPE_CONNECT_CLIENT_ID
+#     - export REACT_APP_STRIPE_CONNECT_SCOPE=$PROD_REACT_APP_STRIPE_CONNECT_SCOPE
+#     - export REACT_APP_STRIPE_CONNECT_REDIRECT_URL=$PROD_REACT_APP_STRIPE_CONNECT_REDIRECT_URL
+#     - export REACT_APP_FRONTEND_CLIENT_URL=$PROD_REACT_APP_FRONTEND_CLIENT_URL
+#   script:
+#     - yarn install --frozen-lockfile && CI=false yarn build
+#   artifacts:
+#     paths:
+#       - infra
+#       - build
+#     expire_in: 3 days
+#   only:
+#     # - /^v.*$/
+#     - feature/new-dev 
+#   # except:
+#   #   - branches
+
+# publish_prod:
+#   stage: publish_prod
+#   variables:
+#     GIT_STRATEGY: none
+#     DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+#     AWS_DEFAULT_REGION: eu-central-1
+#     APP_NAME: assetize-prod-frontend
+#     DOCKER_HOST: tcp://docker:2375
+#   image: 
+#     name: amazon/aws-cli
+#     entrypoint: [""]
+#   services:
+#     - docker:dind
+#   before_script:
+#     - amazon-linux-extras install docker
+#     - aws --version
+#     - docker --version
+#   script:
+#     - echo $AWS_ACCESS_KEY_ID
+#     - docker build -f "${CI_PROJECT_DIR}/infra/Dockerfile" -t $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID . 
+#     - aws ecr get-login-password | docker login --username AWS --password-stdin $DOCKER_REGISTRY
+#     - docker push $DOCKER_REGISTRY/$APP_NAME:$CI_PIPELINE_IID
+#   dependencies:
+#     - pre_build_prod
+#   only:
+#     - feature/new-dev 
+
+# prod_release:
+#   stage: prod_release
+#   dependencies:
+#     - publish_prod
+#   only:
+#     - feature/new-dev 
+#   variables:
+#     ENV: prod
+#     DOCKER_REGISTRY: 300826030284.dkr.ecr.eu-central-1.amazonaws.com
+#     APP_NAME: assetize-prod-frontend
+#     EKS_CLUSTER: assetize-prod-eks
+#     KUBE_NAMESPACE: prod
+#   image: 
+#     name: jshimko/kube-tools-aws
+#   script:
+#     - aws eks update-kubeconfig --name $EKS_CLUSTER
+#     - kubectl get nodes
+#     - |
+#       helm upgrade frontend ${CI_PROJECT_DIR}/helm/charts/frontend --install --wait \
+#         --namespace=$KUBE_NAMESPACE \
+#         --set=app.name=frontend \
+#         --set=image.repository=$DOCKER_REGISTRY \
+#         --set=image.name=$APP_NAME \
+#         --set=image.tag=$CI_PIPELINE_IID \
+#         --debug \
+#         --values=${CI_PROJECT_DIR}/helm/charts/frontend/values_$ENV.yaml
+
+# build_stage:
+#   variables: 
+#     GIT_STRATEGY: none
+#   stage: build
+#   extends: .kaniko_build
+#   dependencies:
+#     - pre_build_stg
+#   only:
+#     - /^q.*$/
+#   except:
+#     - branches
+
+

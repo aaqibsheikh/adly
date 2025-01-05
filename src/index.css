@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import custom fonts */
+@import './font.css';
+
+@import 'slick-carousel/slick/slick.css';
+@import 'slick-carousel/slick/slick-theme.css';
+
+@layer base {
+  body {
+    /* @apply font-helv; */
+    @apply font-inter;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .dot-container {
+    position: relative;
+  }
+
+  .filled-dot {
+    display: none;
+  }
+}
+
+/* Smooth transitions for hover effect */
+.logo-default {
+  transition: opacity 0.3s ease-in-out;
+}
+
+.logo-hover {
+  transition: opacity 0.3s ease-in-out;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  background-color: #1c1c1c;
+}
+
+.scrollbar-dark::-webkit-scrollbar {
+  width: 8px;
+  background-color: #f5f5f5;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background-color: #000000;
+  border: 2px solid #555555;
+  border-radius: 10px;
+}
+
+.custom-next-arrow {
+  right: -90px;
+  z-index: 10;
+}
+
+.custom-prev-arrow {
+  left: -90px;
+  z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .custom-next-arrow,
+  .custom-prev-arrow {
+    display: none !important;
+  }
+}
+
+.slick-prev:before {
+  content: '' !important;
+}
+
+.slick-next:before {
+  content: '' !important;
+}
+
+.pricing-section-home-page {
+  border-radius: 26px;
+  background: var(--Brand-Magnolia, #f7f5ff);
+  backdrop-filter: blur(17.5px);
+}
